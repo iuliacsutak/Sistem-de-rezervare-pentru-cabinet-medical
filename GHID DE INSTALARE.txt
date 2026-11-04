@@ -1,6 +1,6 @@
 1. Instalati Node.js (https://nodejs.org/en/download)
 2. Instalti MongoDB (https://www.mongodb.com/try/download/community)
-3. Clonati proiectul ()
+3. Clonati proiectul (https://github.com/emacoconu/Sistem-de-rezervare-pentru-cabinet-medical)
 4. Deschideti un terminal in folderul cu proiectul
 5. Rulati comanda "npm i"
 6. Rulati comanda "npm run dev"
