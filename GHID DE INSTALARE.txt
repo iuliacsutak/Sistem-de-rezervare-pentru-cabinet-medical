@@ -1,0 +1,7 @@
+1. Instalati Node.js (https://nodejs.org/en/download)
+2. Instalti MongoDB (https://www.mongodb.com/try/download/community)
+3. Clonati proiectul ()
+4. Deschideti un terminal in folderul cu proiectul
+5. Rulati comanda "npm i"
+6. Rulati comanda "npm run dev"
+7. Accesati pagina web pe http://localhost:3000/
