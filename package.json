@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "seed": "node scripts/seed.mjs",
+    "db:seed": "node scripts/seed.mjs",
+    "db:init": "node scripts/seed-initial.mjs",
+    "postinstall": "node scripts/seed-initial.mjs",
     "lint": "eslint"
   },
   "dependencies": {
