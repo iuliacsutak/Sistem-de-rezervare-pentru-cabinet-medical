@@ -36,6 +36,10 @@ interface AppointmentItem {
     durataMinute: number;
   };
 }
+interface SlotItem {
+  ora: string;
+  disponibil: boolean;
+}
 
 export default function PatientDashboard() {
   const [programari, setProgramari] = useState<AppointmentItem[]>([]);
@@ -43,6 +47,11 @@ export default function PatientDashboard() {
   const [filter, setFilter] = useState("ALL");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [reprogramId, setReprogramId] = useState<string | null>(null);
+  const [reprogramData, setReprogramData] = useState("");
+  const [reprogramSloturi, setReprogramSloturi] = useState<SlotItem[]>([]);
+  const [reprogramSlot, setReprogramSlot] = useState("");
+  const [loadingSloturi, setLoadingSloturi] = useState(false);
 
   const fetchProgramari = async () => {
     setLoading(true);
@@ -81,6 +90,63 @@ export default function PatientDashboard() {
         fetchProgramari();
       } else {
         setMessage({ type: "error", text: data.message || "Eroare la anularea programării." });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Eroare de rețea." });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+    const incarcaSloturi = async (medicId: string, data: string) => {
+    setLoadingSloturi(true);
+    setReprogramSlot("");
+    try {
+      const res = await fetch(`/api/medici/${medicId}/sloturi?data=${data}`);
+      const json = await res.json();
+      setReprogramSloturi(json.success ? json.sloturi || [] : []);
+    } catch {
+      setReprogramSloturi([]);
+    } finally {
+      setLoadingSloturi(false);
+    }
+  };
+
+  const deschideReprogramare = (item: AppointmentItem) => {
+    if (!item.medicId) return;
+    const maine = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+    setReprogramId(item._id);
+    setReprogramData(maine);
+    incarcaSloturi(item.medicId._id, maine);
+  };
+
+  const inchideReprogramare = () => {
+    setReprogramId(null);
+    setReprogramSloturi([]);
+    setReprogramSlot("");
+  };
+
+  const handleReschedule = async (id: string) => {
+    if (!reprogramSlot) return;
+
+    setActionLoading(id);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/programari/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataOra: `${reprogramData}T${reprogramSlot}:00` }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMessage({
+          type: "success",
+          text: "Programarea a fost reprogramată și așteaptă confirmarea medicului.",
+        });
+        inchideReprogramare();
+        fetchProgramari();
+      } else {
+        setMessage({ type: "error", text: data.message || "Eroare la reprogramare." });
       }
     } catch {
       setMessage({ type: "error", text: "Eroare de rețea." });
@@ -323,6 +389,67 @@ export default function PatientDashboard() {
                         Motiv: &ldquo;{item.motiv}&rdquo;
                       </p>
                     )}
+                                        {reprogramId === item._id && (
+                      <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                        <div className="text-xs font-bold text-slate-800">
+                          Alege noua dată și oră
+                        </div>
+
+                        <input
+                          type="date"
+                          min={new Date().toISOString().split("T")[0]}
+                          value={reprogramData}
+                          onChange={(e) => {
+                            setReprogramData(e.target.value);
+                            if (item.medicId) incarcaSloturi(item.medicId._id, e.target.value);
+                          }}
+                          className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+
+                        {loadingSloturi ? (
+                          <p className="text-xs text-slate-500">Se verifică disponibilitatea...</p>
+                        ) : reprogramSloturi.length === 0 ? (
+                          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                            Nu sunt ore disponibile în această zi. Alege altă dată.
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                            {reprogramSloturi.map((slot) => (
+                              <button
+                                key={slot.ora}
+                                disabled={!slot.disponibil}
+                                onClick={() => setReprogramSlot(slot.ora)}
+                                className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
+                                  !slot.disponibil
+                                    ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed line-through"
+                                    : reprogramSlot === slot.ora
+                                    ? "bg-blue-600 border-blue-600 text-white"
+                                    : "bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-800"
+                                }`}
+                              >
+                                {slot.ora}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleReschedule(item._id)}
+                            disabled={!reprogramSlot || actionLoading === item._id}
+                            className="px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-colors"
+                          >
+                            {actionLoading === item._id ? "Se salvează..." : "Confirmă reprogramarea"}
+                          </button>
+                          <button
+                            onClick={inchideReprogramare}
+                            className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-colors"
+                          >
+                            Renunță
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {item.diagnosticSauObservatii && (
                       <div className="mt-3 p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-xs text-emerald-900 space-y-1">
@@ -338,13 +465,20 @@ export default function PatientDashboard() {
                 {/* Right: Actions */}
                 <div className="flex items-center gap-3 self-end md:self-center">
                   {canCancel && (
-                    <button
+                                <>    <button
+                      onClick={() => deschideReprogramare(item)}
+                      className="px-3.5 py-2 text-xs font-medium text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+                    >
+                      Reprogramează
+                    </button>
+                   <button
                       onClick={() => handleCancelAppointment(item._id)}
                       disabled={actionLoading === item._id}
                       className="px-3.5 py-2 text-xs font-medium text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-colors disabled:opacity-50"
                     >
                       {actionLoading === item._id ? "Se anulează..." : "Anulează Programarea"}
                     </button>
+                    </>
                   )}
                 </div>
               </div>

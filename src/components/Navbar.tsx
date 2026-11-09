@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   ChevronDown,
+  Bell,
 } from "lucide-react";
 
 interface UserSession {
@@ -20,6 +21,12 @@ interface UserSession {
   nume: string;
   email: string;
   rol: "PATIENT" | "DOCTOR" | "ADMIN";
+}
+interface Notificare {
+  _id: string;
+  mesaj: string;
+  citita: boolean;
+  createdAt: string;
 }
 
 export default function Navbar() {
@@ -29,6 +36,9 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginDropdownOpen, setLoginDropdownOpen] = useState(false);
+    const [notificari, setNotificari] = useState<Notificare[]>([]);
+  const [necitite, setNecitite] = useState(0);
+  const [bellOpen, setBellOpen] = useState(false);
 
   useEffect(() => {
     async function fetchUser() {
@@ -48,6 +58,39 @@ export default function Navbar() {
     }
     fetchUser();
   }, [pathname]);
+    useEffect(() => {
+    if (!user) return;
+
+    async function incarcaNotificari() {
+      try {
+        const res = await fetch("/api/notificari");
+        if (res.ok) {
+          const data = await res.json();
+          setNotificari(data.notificari);
+          setNecitite(data.necitite);
+        }
+      } catch {
+        // ignorăm erorile de rețea
+      }
+    }
+
+    incarcaNotificari();
+    const interval = setInterval(incarcaNotificari, 15000); // reîmprospătare la 15 secunde
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const toggleBell = async () => {
+    const deschide = !bellOpen;
+    setBellOpen(deschide);
+    if (deschide && necitite > 0) {
+      try {
+        await fetch("/api/notificari", { method: "PATCH" });
+        setNecitite(0);
+      } catch {
+        // ignorăm
+      }
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -115,6 +158,48 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-3">
             {!loading && user ? (
               <div className="flex items-center gap-3">
+                              <div className="relative">
+                  <button
+                    onClick={toggleBell}
+                    title="Notificări"
+                    className="relative p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  >
+                    <Bell className="w-4 h-4" />
+                    {necitite > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                        {necitite}
+                      </span>
+                    )}
+                  </button>
+
+                  {bellOpen && (
+                    <div
+                      onMouseLeave={() => setBellOpen(false)}
+                      className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-100 z-50 max-h-96 overflow-y-auto"
+                    >
+                      <div className="px-3 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                        Notificări
+                      </div>
+                      {notificari.length === 0 ? (
+                        <p className="px-3 py-4 text-xs text-slate-500">Nu ai notificări.</p>
+                      ) : (
+                        notificari.map((n) => (
+                          <div
+                            key={n._id}
+                            className={`px-3 py-2.5 text-xs border-b border-slate-50 last:border-0 ${
+                              n.citita ? "text-slate-600" : "bg-blue-50 text-slate-800 font-medium"
+                            }`}
+                          >
+                            <p>{n.mesaj}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {new Date(n.createdAt).toLocaleString("ro-RO")}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
                 <Link
                   href={getDashboardUrl()}
                   className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
@@ -213,11 +298,16 @@ export default function Navbar() {
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center">
-            <button
+                        <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-600 hover:text-slate-900 focus:outline-none"
+              className="relative p-2 text-slate-600 hover:text-slate-900 focus:outline-none"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {user && necitite > 0 && !mobileMenuOpen && (
+                <span className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {necitite}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -259,6 +349,43 @@ export default function Navbar() {
             {user ? (
               <div className="space-y-2">
                 <div className="text-xs text-slate-500">Conectat ca {user.nume}</div>
+                                <div>
+                  <button
+                    onClick={toggleBell}
+                    className="flex items-center justify-between w-full bg-slate-50 text-slate-700 font-medium text-xs py-2 px-3 rounded-lg"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Bell className="w-4 h-4" /> Notificări
+                    </span>
+                    {necitite > 0 && (
+                      <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                        {necitite}
+                      </span>
+                    )}
+                  </button>
+
+                  {bellOpen && (
+                    <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-slate-100">
+                      {notificari.length === 0 ? (
+                        <p className="px-3 py-3 text-xs text-slate-500">Nu ai notificări.</p>
+                      ) : (
+                        notificari.map((n) => (
+                          <div
+                            key={n._id}
+                            className={`px-3 py-2.5 text-xs border-b border-slate-50 last:border-0 ${
+                              n.citita ? "text-slate-600" : "bg-blue-50 text-slate-800 font-medium"
+                            }`}
+                          >
+                            <p>{n.mesaj}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {new Date(n.createdAt).toLocaleString("ro-RO")}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
                 <Link
                   href={getDashboardUrl()}
                   onClick={() => setMobileMenuOpen(false)}
